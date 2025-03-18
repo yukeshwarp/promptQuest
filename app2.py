@@ -125,7 +125,7 @@ def summarize(text):
         ],
         temperature=0.5,
     )
-    return response.choices[0].delta.content
+    return response.choices[0].message.content
 
 # Function to fetch data from Cosmos DB
 def fetch_chat_titles(limit=250, time_filter="All Time"):
