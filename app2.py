@@ -116,6 +116,18 @@ with st.sidebar:
     if st.button("Refresh Data", key="refresh_button"):
         st.session_state["refresh_data"] = True
 
+def summarize(text):
+    response_stream = llmclient.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant expert in summarizing."},
+            {"role": "user", "content": f"Summarize the following chat title: {text}"}
+        ],
+        temperature=0.5,
+        stream=True,
+    )
+    return response.choices[0].messages.content
+
 # Function to fetch data from Cosmos DB
 def fetch_chat_titles(limit=250, time_filter="All Time"):
     try:
@@ -142,9 +154,9 @@ def fetch_chat_titles(limit=250, time_filter="All Time"):
         client = CosmosClient(ENDPOINT, KEY)
         database = client.get_database_client(DATABASE_NAME)
         container = database.get_container_client(CONTAINER_NAME)
-        
+
         items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
-        return [{"title": item["ChatTitle"], "timestamp": item.get("TimeStamp"), "assistant": item.get("AssistantName")} for item in items]
+        return [{"title": summarize(item["ChatTitle"]), "timestamp": item.get("TimeStamp"), "assistant": item.get("AssistantName")} for item in items]
     except Exception as e:
         st.error(f"Error fetching data: {str(e)}")
         return []
