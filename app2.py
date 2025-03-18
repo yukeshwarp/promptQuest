@@ -117,14 +117,13 @@ with st.sidebar:
         st.session_state["refresh_data"] = True
 
 def summarize(text):
-    response_stream = llmclient.chat.completions.create(
+    response = llmclient.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a helpful assistant expert in summarizing."},
-            {"role": "user", "content": f"Summarize the following chat title: {text}"}
+            {"role": "user", "content": f"Summarize the following chat: {text}"}
         ],
         temperature=0.5,
-        stream=True,
     )
     return response.choices[0].messages.content
 
