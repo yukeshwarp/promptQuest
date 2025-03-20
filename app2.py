@@ -299,7 +299,8 @@ elif st.session_state["current_page"] == "Chat Analysis":
                 time.sleep(1)  # Simulating API call
                 
                 # For demonstration, create a simple response
-                topic_names = [t["topic"] for t in topics]
+                # topic_names = [t["topic"] for t in topics]
+                
                 # bot_response = f"Based on the analysis of {len(st.session_state['chat_titles'])} chat titles, I found these main topics: {', '.join(topic_names[:5])}. Your question about '{prompt}' relates to several of these topics."
                 
                 # In the real implementation, you would use:
