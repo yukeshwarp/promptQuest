@@ -125,7 +125,7 @@ def summarize(text):
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a helpful assistant expert in summarizing."},
-            {"role": "user", "content": f"Summarize the following chat in less than 100 words with understanding of intent in the chat: {text}"}
+            {"role": "user", "content": f"Summarize the following chat in less than 25 words with understanding of intent in the chat: {text}"}
         ],
         temperature=0.5,
     )
