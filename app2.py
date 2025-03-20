@@ -12,7 +12,8 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from dash import dcc
-
+import concurrent.futures
+++
 # Page configuration
 st.set_page_config(
     page_title="promptQuest",
@@ -116,12 +117,15 @@ with st.sidebar:
     if st.button("Refresh Data", key="refresh_button"):
         st.session_state["refresh_data"] = True
 
+
+
+# Function to summarize text using LLM
 def summarize(text):
     response = llmclient.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a helpful assistant expert in summarizing."},
-            {"role": "user", "content": f"Summarize the following chat: {text}"}
+            {"role": "user", "content": f"Summarize the following chat in less than 100 words with understanding of intent in the chat: {text}"}
         ],
         temperature=0.5,
     )
@@ -155,11 +159,18 @@ def fetch_chat_titles(limit=250, time_filter="All Time"):
         container = database.get_container_client(CONTAINER_NAME)
 
         items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
-        return [{"title": summarize(item["ChatTitle"]), "timestamp": item.get("TimeStamp"), "assistant": item.get("AssistantName")} for item in items]
+        
+        # Use ThreadPoolExecutor to parallelize summarization
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            summaries = list(executor.map(summarize, [item["ChatTitle"] for item in items]))
+
+        # Combine summaries with the other relevant data
+        return [{"title": summary, "timestamp": item.get("TimeStamp"), "assistant": item.get("AssistantName")} for item, summary in zip(items, summaries)]
+    
     except Exception as e:
         st.error(f"Error fetching data: {str(e)}")
         return []
-text_content = ""
+
 # Function to analyze topics
 def analyze_topics(chat_titles):
     if not chat_titles:
