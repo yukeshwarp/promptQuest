@@ -282,6 +282,11 @@ elif st.session_state["current_page"] == "Chat Analysis":
     if prompt := st.chat_input("Ask a question about your emails"):
         text_content = st.session_state["text_content"]
         topics = st.session_state["topics"]
+        for chat in st.session_state["chat_titles"]:
+            assistant_name = chat.get("assistant", "Unknown")
+            chat_text = chat.get("title", "Unknown")
+            topics += assistant_name + chat_text
+            
         bot_response = ""
         if text_content and topics:
             st.session_state["messages"].append({"role": "user", "content": prompt})
