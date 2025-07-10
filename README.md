@@ -36,14 +36,12 @@
 ## Overview
 
 **promptQuest** is a Streamlit-based analytics dashboard for exploring and analyzing chat data stored in Azure Cosmos DB. It leverages classical NLP (topic modeling) and LLMs (via Azure OpenAI) to analyze chat titles and trends.  
-⚠️ **Note:** Some features described below (full-text search, chart visualizations, spaCy NLP, etc.) are not currently implemented—see details in each section.
 
 ---
 
 ## Features
 
-- **Interactive Chat History:** View and filter prior chat interactions by date, quarter, or entry count.  
-  _Note: No keyword or full-text search is currently available._
+- **Interactive Chat History:** View and filter prior chat interactions by date, quarter, or entry count.
 - **Topic Modeling:** Automatically extract and summarize key topics and trends from large batches of chat titles using NMF (Non-negative Matrix Factorization).
 - **LLM-powered Analytics:** Use Azure OpenAI to interpret topic clusters and provide human-readable topic names and summaries.
 - **Trend Analysis:** Generate simple trend reports on chat activity.
@@ -79,8 +77,6 @@
 ### 2. Preprocessing
 
 - Cleans and preprocesses text using NLTK: strips punctuation and removes stopwords.
-- _No lemmatization or normalization is currently performed despite earlier claims; the README has been updated to reflect this._  
-- **spaCy** is listed in dependencies but is currently unused in code. You may remove it from your environment if not required.
 
 ### 3. Topic Modeling
 
@@ -96,7 +92,6 @@
 ### 5. Trend Analysis
 
 - Uses LLM for high-level trend summaries from recent chat data.
-- _Note: All trend outputs are plain text; there are currently no charts or KPIs._
 
 ### 6. Streamlit Interface
 
@@ -104,7 +99,6 @@
 - Main views:
   - **Chat View:** Explore and interact with chat data.
   - **Analytics View:** See quarterly topic breakdowns and trend reports.
-- _No keyword or full-text search is available. Filtering is by date or quantity only._
 
 ---
 
@@ -130,7 +124,6 @@ cd promptQuest
 ```bash
 pip install -r requirements.txt
 ```
-> ⚠️ **spaCy** is listed but not used; you may remove it unless you plan to extend the NLP pipeline.
 
 ### 3. Set Up Environment
 
@@ -177,7 +170,6 @@ streamlit run app.py
 
 ### `preprocessor.py`
 - Text cleaning: strips punctuation, removes stopwords.
-- _No normalization or lemmatization is performed._
 
 ### `cloud_config.py`
 - Loads all cloud credentials and instantiates the Cosmos DB and Azure OpenAI clients.
@@ -262,6 +254,5 @@ Common pitfalls include:
 - `azure-cosmos` - Cosmos DB API client
 - `nltk` - Text preprocessing (stopwords)
 - `python-dotenv` - Load environment variables
-- ~~`spacy`~~ - _Listed but not used in current code; safe to remove unless extending NLP pipeline._
 
 See `requirements.txt` for full list.
