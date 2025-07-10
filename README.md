@@ -23,24 +23,34 @@
   - [`topicmodelling_dev.py`](#topicmodelling_devpy)
   - [`preprocessor.py`](#preprocessorpy)
   - [`cloud_config.py`](#cloud_configpy)
+- [Prompt Engineering](#prompt-engineering)
+- [Error Handling & Troubleshooting](#error-handling--troubleshooting)
+- [Configuration](#configuration)
+- [Performance and Cost Caveats](#performance-and-cost-caveats)
+- [Cloud Resource Requirements](#cloud-resource-requirements)
 - [Example: Topic Extraction Pipeline](#example-topic-extraction-pipeline)
 - [Dependencies](#dependencies)
-- 
+
+---
+
 ## Overview
 
-**promptQuest** is a Streamlit-based analytics dashboard for exploring and analyzing chat data stored in Azure Cosmos DB. It leverages classical NLP (topic modeling) and LLMs (via Azure OpenAI) to extract, summarize, and interpret trends and topics from chat conversations, originally designed for legal advice chatbot interactions.
+**promptQuest** is a Streamlit-based analytics dashboard for exploring and analyzing chat data stored in Azure Cosmos DB. It leverages classical NLP (topic modeling) and LLMs (via Azure OpenAI) to analyze chat titles and trends.  
+⚠️ **Note:** Some features described below (full-text search, chart visualizations, spaCy NLP, etc.) are not currently implemented—see details in each section.
 
 ---
 
 ## Features
 
-- **Interactive Chat History:** View and search prior chat interactions, filterable by date, quarter, or entry count.
+- **Interactive Chat History:** View and filter prior chat interactions by date, quarter, or entry count.  
+  _Note: No keyword or full-text search is currently available._
 - **Topic Modeling:** Automatically extract and summarize key topics and trends from large batches of chat titles using NMF (Non-negative Matrix Factorization).
 - **LLM-powered Analytics:** Use Azure OpenAI to interpret topic clusters and provide human-readable topic names and summaries.
-- **Trend Analysis:** Generate trend reports and visual analytics on chat activity over time.
+- **Trend Analysis:** Generate simple trend reports on chat activity.
 - **Custom Filtering:** Flexible sidebar to filter chat data by monthly, quarterly, custom date range, or number of entries.
-- **User-friendly Analytics View:** Visualize quarterly topic analyses and trends side-by-side.
-- **Preprocessing Pipeline:** Text cleaning and stopword removal for robust topic extraction.
+- **User-friendly Analytics View:** Visualize quarterly topic analyses and trends.  
+  _Note: Output is currently plain text—no charts or graphical KPIs are rendered._
+- **Preprocessing Pipeline:** Text cleaning and stopword removal for topic extraction (see details below).
 
 ---
 
@@ -53,6 +63,8 @@
 ├── preprocessor.py       # Text preprocessing functions
 ├── cloud_config.py       # Azure and Cosmos DB configuration
 ├── requirements.txt      # Python dependencies
+├── .env.example          # Example environment variable file
+├── test_app.py           # (If exists) Example test script
 ```
 
 ---
@@ -66,7 +78,9 @@
 
 ### 2. Preprocessing
 
-- Cleans and preprocesses text using NLTK (stopword removal, tokenization, normalization).
+- Cleans and preprocesses text using NLTK: strips punctuation and removes stopwords.
+- _No lemmatization or normalization is currently performed despite earlier claims; the README has been updated to reflect this._  
+- **spaCy** is listed in dependencies but is currently unused in code. You may remove it from your environment if not required.
 
 ### 3. Topic Modeling
 
@@ -82,6 +96,7 @@
 ### 5. Trend Analysis
 
 - Uses LLM for high-level trend summaries from recent chat data.
+- _Note: All trend outputs are plain text; there are currently no charts or KPIs._
 
 ### 6. Streamlit Interface
 
@@ -89,6 +104,7 @@
 - Main views:
   - **Chat View:** Explore and interact with chat data.
   - **Analytics View:** See quarterly topic breakdowns and trend reports.
+- _No keyword or full-text search is available. Filtering is by date or quantity only._
 
 ---
 
@@ -97,7 +113,9 @@
 ### Prerequisites
 
 - Python 3.8+
-- Azure subscription with access to Cosmos DB and Azure OpenAI
+- Azure subscription with:
+  - Cosmos DB (see [Cloud Resource Requirements](#cloud-resource-requirements) for API type)
+  - Azure OpenAI with deployed models (see below)
 - `.env` file with required credentials (see below)
 
 ### 1. Clone the Repository
@@ -112,10 +130,11 @@ cd promptQuest
 ```bash
 pip install -r requirements.txt
 ```
+> ⚠️ **spaCy** is listed but not used; you may remove it unless you plan to extend the NLP pipeline.
 
 ### 3. Set Up Environment
 
-Create a `.env` file in the project root with the following variables:
+Create a `.env` file in the project root with the following variables (see `.env.example`):
 
 ```env
 DB_ENDPOINT=your_cosmos_endpoint
@@ -139,40 +158,99 @@ streamlit run app.py
 
 - Use the sidebar to load/filter chat data.
 - Switch between "Chat View" and "Analytics View" for different perspectives.
-- Ask questions about the data in chat view; the LLM will generate insightful responses based on chat history and extracted topics.
+- Ask questions about the data in chat view; the LLM will generate responses based on chat history and extracted topics.
 
 ---
 
 ## Core Components
 
 ### `app.py`
-
 - Orchestrates UI, handles user inputs, and coordinates data queries and analysis.
 - Manages session state for chat and analytics views.
 - Handles querying Cosmos DB and passing data to topic modeling and LLM modules.
+- **Note:** Date/offset filtering only; no search or graphical visualizations.
 
 ### `topicmodelling_dev.py`
-
 - `extract_topics_from_text`: runs NMF topic modeling and returns structured results.
 - `interpret_topics_with_llm`: sends topic clusters to the LLM and parses/returns JSON topic summaries.
+- Contains large prompt templates for LLM (see [Prompt Engineering](#prompt-engineering)).
 
 ### `preprocessor.py`
-
-- Text cleaning: remove non-alphanumeric characters, normalize spaces, remove stopwords.
+- Text cleaning: strips punctuation, removes stopwords.
+- _No normalization or lemmatization is performed._
 
 ### `cloud_config.py`
-
 - Loads all cloud credentials and instantiates the Cosmos DB and Azure OpenAI clients.
+
+---
+
+## Prompt Engineering
+
+- **Prompt Objectives:** The code uses custom prompts to instruct the LLM to label topic clusters and generate summaries of chat data.
+- **Expected Response Schema:** JSON objects containing topic labels, descriptions, and summaries.
+- **Prompt Adaptation:** You can edit prompt templates in `topicmodelling_dev.py` or `app.py` to experiment with schema or objectives.
+- **Token & Rate Limit Considerations:** LLM calls are made in loops (e.g., per quarter), which may increase both latency and token costs. See [Performance and Cost Caveats](#performance-and-cost-caveats).
+
+---
+
+## Error Handling & Troubleshooting
+
+Common pitfalls include:
+
+- **Missing NLTK Corpora:**  
+  If you see a `LookupError` for stopwords, run:
+  ```python
+  import nltk
+  nltk.download('stopwords')
+  ```
+- **Invalid Endpoint URLs:**  
+  Double-check your `.env` values.
+- **401/403 Authorization Errors:**  
+  Ensure keys and endpoint URLs are current and valid.
+- **Azure Quota or Rate Limits:**  
+  LLM calls may fail if rate-limited or if quota is exhausted.
+- **Cosmos DB Indexing:**  
+  If you plan to add full-text search, ensure your Cosmos DB indexing policy supports it (see [Cloud Resource Requirements](#cloud-resource-requirements)).
+
+---
+
+## Configuration
+
+- **Model Names:**  
+  LLM deployment/model names (e.g., `gpt-4.1`, `model-router`) are currently hard-coded in the source (see `cloud_config.py` or LLM call sites).  
+  _To change the model, edit the relevant variable or function argument._
+- **Environment Variables:**  
+  All secrets are loaded from `.env` (see [Installation](#installation)).
+
+---
+
+## Performance and Cost Caveats
+
+- **Looped LLM Calls:**  
+  Analytics and topic labeling may call the LLM once per quarter or topic; this can result in high token usage and slow response times.
+- **Cost Warnings:**  
+  Each LLM call incurs cost; review your OpenAI usage and set limits as needed.
+
+---
+
+## Cloud Resource Requirements
+
+- **Cosmos DB:**  
+  - API type: _Core (SQL)_ recommended.  
+  - Indexing: If you wish to add full-text search, ensure the indexing policy supports it (see [docs](https://learn.microsoft.com/en-us/azure/cosmos-db/sql/index-policy)).
+- **Azure OpenAI:**  
+  - You must deploy the required models (e.g., GPT-4) and specify their deployment names.
+  - Update your `.env` and code to reference the correct endpoints and deployment names.
 
 ---
 
 ## Example: Topic Extraction Pipeline
 
 1. Fetch N chat titles from Cosmos DB.
-2. Preprocess titles (remove stopwords, clean).
+2. Preprocess titles (strip punctuation, remove stopwords).
 3. Run NMF to extract clusters of keywords per topic.
 4. Send keyword clusters to LLM for human-readable topic labeling.
-5. Display results in Streamlit dashboard.
+5. Display results in Streamlit dashboard (plain text only).
 
 ---
 
@@ -182,7 +260,8 @@ streamlit run app.py
 - `scikit-learn` - Topic modeling (NMF, TF-IDF)
 - `openai` - Azure OpenAI API client
 - `azure-cosmos` - Cosmos DB API client
-- `nltk` and `spacy` - Text preprocessing
+- `nltk` - Text preprocessing (stopwords)
 - `python-dotenv` - Load environment variables
+- ~~`spacy`~~ - _Listed but not used in current code; safe to remove unless extending NLP pipeline._
 
 See `requirements.txt` for full list.
