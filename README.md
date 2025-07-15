@@ -29,13 +29,27 @@
 - [Performance and Cost Caveats](#performance-and-cost-caveats)
 - [Cloud Resource Requirements](#cloud-resource-requirements)
 - [Example: Topic Extraction Pipeline](#example-topic-extraction-pipeline)
+- [Logging](#logging)
 - [Dependencies](#dependencies)
 
 ---
 
 ## Overview
 
-**promptQuest** is a Streamlit-based analytics dashboard for exploring and analyzing chat data stored in Azure Cosmos DB. It leverages classical NLP (topic modeling) and LLMs (via Azure OpenAI) to analyze chat titles and trends.  
+**promptQuest** is a Streamlit-based analytics dashboard for exploring and analyzing chat data stored in Azure Cosmos DB. It leverages classical NLP (topic modeling) and LLMs (via Azure OpenAI) to extract, interpret, and summarize conversational trends.
+
+### Application Architecture
+
+```text
++-----------+      +-----------+    +----------------+     +---------------+    +-------------------+    +-----------------+
+|  Browser  | ---> | Streamlit |--> |  CosmosClient  | --> |   Topic Model  |--> |   AzureOpenAI     |--> |   Streamlit UI  |
+| (User)    |      |  (app.py) |    | (cloud_config) |     |(topicmodelling|    | (cloud_config)    |    |   (results,     |
+|           |      |           |    |    Singleton)  |     |_dev.py)       |    |   Singleton)      |    |   analytics)    |
++-----------+      +-----------+    +----------------+     +---------------+    +-------------------+    +-----------------+
+
+- All cloud clients (CosmosClient, AzureOpenAI) are instantiated once in cloud_config.py
+- Imported by app.py and topicmodelling_dev.py for data and LLM access
+```
 
 ---
 
@@ -45,7 +59,7 @@
 - **Topic Modeling:** Automatically extract and summarize key topics and trends from large batches of chat titles using NMF (Non-negative Matrix Factorization).
 - **LLM-powered Analytics:** Use Azure OpenAI to interpret topic clusters and provide human-readable topic names and summaries.
 - **Trend Analysis:** Generate simple trend reports on chat activity.
-- **Custom Filtering:** Flexible sidebar to filter chat data by monthly, quarterly, custom date range, or number of entries.
+- **Custom Filtering:** Flexible sidebar to filter chat data by monthly, quarterly, custom date range, or number of entries (with OFFSET slider and date range precedence).
 - **User-friendly Analytics View:** Visualize quarterly topic analyses and trends.  
   _Note: Output is currently plain text—no charts or graphical KPIs are rendered._
 - **Preprocessing Pipeline:** Text cleaning and stopword removal for topic extraction (see details below).
@@ -59,7 +73,7 @@
 ├── app.py                # Main Streamlit application
 ├── topicmodelling_dev.py # Topic modeling and LLM topic interpretation utilities
 ├── preprocessor.py       # Text preprocessing functions
-├── cloud_config.py       # Azure and Cosmos DB configuration
+├── cloud_config.py       # Azure and Cosmos DB configuration (single-source clients)
 ├── requirements.txt      # Python dependencies
 ├── .env.example          # Example environment variable file
 ├── test_app.py           # (If exists) Example test script
@@ -91,14 +105,27 @@
 
 ### 5. Trend Analysis
 
-- Uses LLM for high-level trend summaries from recent chat data.
+**Prompt Objective:**  
+After fetching and preprocessing chat data, a dedicated LLM prompt is sent to Azure OpenAI to generate a trend summary based on the latest entries.  
+**When & Where:**  
+Trend analysis is triggered after each data fetch and appears in the "Chat View" as a plain text summary.  
+**Token & Cost Note:**  
+Trend Analysis runs as a standalone LLM call for each dataset/view—token consumption scales with data volume and prompt complexity.  
+**Implementation:**  
+The code uses a dedicated prompt template for trend detection (see `topicmodelling_dev.py`).  
+**Implications:**  
+Monitor OpenAI usage and consider prompt tuning for cost efficiency.
 
 ### 6. Streamlit Interface
 
-- Sidebar controls: choose date range, quarter, or entry count for analysis.
+- Sidebar controls: choose date range, quarter, or entry count for analysis.  
+  - _If both OFFSET slider and date range are set, date range takes precedence._
+  - _Entry count filtering can be resource-intensive for large datasets, as it uses RU-heavy COUNT(*) queries._
+  - _Consider adding composite indexes or continuation tokens for better scaling (future work)._
 - Main views:
-  - **Chat View:** Explore and interact with chat data.
+  - **Chat View:** Explore and interact with chat data (LLM-backed responses, trend summary).
   - **Analytics View:** See quarterly topic breakdowns and trend reports.
+  - _Note: Analytics View uses a single LLM request to enumerate the top 10 unique topics, not NMF._
 
 ---
 
@@ -111,6 +138,14 @@
   - Cosmos DB (see [Cloud Resource Requirements](#cloud-resource-requirements) for API type)
   - Azure OpenAI with deployed models (see below)
 - `.env` file with required credentials (see below)
+- **NLTK Data:**  
+  Before first run, install NLTK's stopwords and punkt corpora:
+  ```python
+  import nltk
+  nltk.download('stopwords')
+  nltk.download('punkt')
+  ```
+  _Or bake into Dockerfile/CI for faster startup and no runtime download._
 
 ### 1. Clone the Repository
 
@@ -162,17 +197,24 @@ streamlit run app.py
 - Manages session state for chat and analytics views.
 - Handles querying Cosmos DB and passing data to topic modeling and LLM modules.
 - **Note:** Date/offset filtering only; no search or graphical visualizations.
+- **Cloud client usage:** Imports CosmosClient and AzureOpenAI from `cloud_config.py` singleton (do not instantiate directly).
 
 ### `topicmodelling_dev.py`
 - `extract_topics_from_text`: runs NMF topic modeling and returns structured results.
+  - May return an empty list if text is too short or has too few features.
 - `interpret_topics_with_llm`: sends topic clusters to the LLM and parses/returns JSON topic summaries.
 - Contains large prompt templates for LLM (see [Prompt Engineering](#prompt-engineering)).
+- **Cloud client usage:** Imports AzureOpenAI client from `cloud_config.py` singleton.
+- **Logging:** Uses Python logging for debug/info/warning output.
 
 ### `preprocessor.py`
 - Text cleaning: strips punctuation, removes stopwords.
 
 ### `cloud_config.py`
-- Loads all cloud credentials and instantiates the Cosmos DB and Azure OpenAI clients.
+- Loads all cloud credentials and instantiates the Cosmos DB and Azure OpenAI clients **once** (singleton pattern).
+- All other modules should import these singletons to avoid redundant connections and to improve rate-limit handling and efficiency.
+- **Why singleton?**  
+  - Prevents multiple connections to cloud resources, reduces risk of hitting rate limits or quota exhaustion, and centralizes client configuration/secret handling.
 
 ---
 
@@ -189,12 +231,22 @@ streamlit run app.py
 
 Common pitfalls include:
 
+- **No topics returned?**  
+  - `extract_topics_from_text` may return an empty list if input text is too short (< 10 tokens) or has fewer than 2 features after vectorization.
+  - **Troubleshooting:**  
+    - Check your input text length and diversity.
+    - Set `LOG_LEVEL=INFO` for more detailed logs on topic extraction.
+    - Ensure NLTK resources are installed.
+- **Logging errors:**  
+  - Enable detailed logging by setting `export LOG_LEVEL=INFO` or running via `python -m promptQuest --log-level debug`.
 - **Missing NLTK Corpora:**  
   If you see a `LookupError` for stopwords, run:
   ```python
   import nltk
   nltk.download('stopwords')
+  nltk.download('punkt')
   ```
+  _Best practice: download as a setup step or in your Docker build, not at runtime._
 - **Invalid Endpoint URLs:**  
   Double-check your `.env` values.
 - **401/403 Authorization Errors:**  
@@ -203,6 +255,10 @@ Common pitfalls include:
   LLM calls may fail if rate-limited or if quota is exhausted.
 - **Cosmos DB Indexing:**  
   If you plan to add full-text search, ensure your Cosmos DB indexing policy supports it (see [Cloud Resource Requirements](#cloud-resource-requirements)).
+
+**Streamlit Warnings:**  
+- Caught exceptions and errors should be logged with `logging` and shown as user-friendly `st.warning` messages instead of silent failures.
+- Avoid bare `except Exception`; always log details for debugging.
 
 ---
 
@@ -222,6 +278,8 @@ Common pitfalls include:
   Analytics and topic labeling may call the LLM once per quarter or topic; this can result in high token usage and slow response times.
 - **Cost Warnings:**  
   Each LLM call incurs cost; review your OpenAI usage and set limits as needed.
+- **Filtering:**  
+  Large OFFSET or COUNT(*) queries on Cosmos DB can consume significant RU; use with caution for big datasets.
 
 ---
 
@@ -243,6 +301,21 @@ Common pitfalls include:
 3. Run NMF to extract clusters of keywords per topic.
 4. Send keyword clusters to LLM for human-readable topic labeling.
 5. Display results in Streamlit dashboard (plain text only).
+
+---
+
+## Logging
+
+- To enable detailed logs, set:
+  ```bash
+  export LOG_LEVEL=INFO
+  ```
+  or
+  ```bash
+  python -m promptQuest --log-level debug
+  ```
+- This will output warnings from the vectorizer, NMF, and all major steps.
+- For troubleshooting, logs will show if topics are not extracted, NLTK is missing, or LLM/cosmos calls fail.
 
 ---
 
