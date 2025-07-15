@@ -40,16 +40,8 @@
 
 ### Application Architecture
 
-```text
-+-----------+      +-----------+    +----------------+     +---------------+    +-------------------+    +-----------------+
-|  Browser  | ---> | Streamlit |--> |  CosmosClient  | --> |   Topic Model  |--> |   AzureOpenAI     |--> |   Streamlit UI  |
-| (User)    |      |  (app.py) |    | (cloud_config) |     |(topicmodelling|    | (cloud_config)    |    |   (results,     |
-|           |      |           |    |    Singleton)  |     |_dev.py)       |    |   Singleton)      |    |   analytics)    |
-+-----------+      +-----------+    +----------------+     +---------------+    +-------------------+    +-----------------+
+<img width="1390" height="908" alt="diagram-export-15-7-2025-1_13_57-pm" src="https://github.com/user-attachments/assets/e059d419-5964-4928-86f0-51a4f6d02608" />
 
-- All cloud clients (CosmosClient, AzureOpenAI) are instantiated once in cloud_config.py
-- Imported by app.py and topicmodelling_dev.py for data and LLM access
-```
 
 ---
 
