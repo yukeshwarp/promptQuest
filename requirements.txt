@@ -1,9 +1,7 @@
 nltk
-transformers
 streamlit
 datetime
 azure-cosmos
 openai
 scikit-learn
-spacy
 python-dotenv

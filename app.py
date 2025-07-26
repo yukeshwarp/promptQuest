@@ -4,6 +4,7 @@ from cloud_config import CONTAINER_NAME, ENDPOINT, DATABASE_NAME, llmclient, KEY
 from topicmodelling_dev import extract_topics_from_text
 from preprocessor import preprocess_text
 from azure.cosmos import CosmosClient
+from trend_analysis import analyze_trends
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -163,6 +164,7 @@ with st.sidebar:
     fetch_button = st.button("Fetch Data")
 
     if fetch_button:
+
         try:
             if filter_option == "Date Range":
                 # Handle both Monthly and Quarterly
@@ -179,10 +181,14 @@ with st.sidebar:
             elif filter_option == "Number of Entries":
                 query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c ORDER BY c.TimeStamp DESC OFFSET {start_offset} LIMIT {limit}"
 
-            # Query Cosmos DB
-            items = list(
-                container.query_items(query=query, enable_cross_partition_query=True)
-            )
+            try:
+                # Query Cosmos DB
+                items = list(
+                    container.query_items(query=query, enable_cross_partition_query=True)
+                )
+            except Exception as cosmos_err:
+                st.error(f"Database error: {str(cosmos_err)}")
+                items = []
 
             # Display results
             if items:
@@ -197,43 +203,39 @@ with st.sidebar:
                     (chat.get("ChatTitle") or "(No Title)")[:50] for chat in st.session_state["chats"]
                 ]
                 chat_titles_text = "\n".join(chat_titles)  # Join chat titles into a single text block
-                st.session_state["topics"] = extract_topics_from_text(chat_titles_text)
-                st.session_state["processed_chat_titles"] = preprocess_text(
-                    chat_titles_text
-                )
+                try:
+                    st.session_state["topics"] = extract_topics_from_text(chat_titles_text)
+                except Exception as topic_err:
+                    st.warning(f"Topic extraction error: {str(topic_err)}")
+                    st.session_state["topics"] = []
+                try:
+                    st.session_state["processed_chat_titles"] = preprocess_text(
+                        chat_titles_text
+                    )
+                except Exception as preprocess_err:
+                    st.warning(f"Preprocessing error: {str(preprocess_err)}")
+                    st.session_state["processed_chat_titles"] = chat_titles_text
 
                 # Get trend analysis
                 if chat_titles:
-                    with st.spinner("Analyzing trends..."):
-                        trend_analysis_response = llmclient.chat.completions.create(
-                            model="model-router",
-                            messages=[
-                                {
-                                    "role": "system",
-                                    "content": "You are an expert data analyst analyzing trends from user interaction data.",
-                                },
-                                {
-                                    "role": "user",
-                                    "content": f"""
-                                    Analyze the following chat titles for trends, topics, and insights based on user interactions. 
-                                    Provide a summary of key trends and observations.
-                                    
-                                    Chat Titles:
-                                    {st.session_state["processed_chat_titles"]}
-                                """,
-                                },
-                            ],
-                            temperature=0.7,
-                            stream=False,  # We want a complete response, not a stream
-                        )
-                        st.session_state["trend_analysis"] = (
-                            trend_analysis_response.choices[0].message.content
-                        )
+                    try:
+                        with st.spinner("Analyzing trends..."):
+                            trend_analysis_response = analyze_trends(
+                                st.session_state["processed_chat_titles"]
+                            )
+                            st.session_state["trend_analysis"] = (
+                                trend_analysis_response.choices[0].message.content
+                            )
+                    except Exception as trend_err:
+                        st.warning(f"Trend analysis error: {str(trend_err)}")
+                        st.session_state["trend_analysis"] = ""
             else:
-                st.write("No data found for the selected range.")
+                st.info("No data found for the selected range.")
 
+        except ValueError as ve:
+            st.error(f"Date parsing error: {str(ve)}")
         except Exception as e:
-            st.write(f"An error occurred: {str(e)}")
+            st.error(f"An unexpected error occurred: {str(e)}")
 
     # Display filter information
     if "chats" in st.session_state and st.session_state["chats"]:
@@ -276,9 +278,18 @@ if st.session_state["current_view"] == "Chat":
             with st.chat_message("user"):
                 st.markdown(prompt)
 
+            # Summarize topics to 2-3 bullet points if available
+            topics_summary = ""
+            topics = st.session_state.get("topics", [])
+            if isinstance(topics, list) and topics:
+                # Use up to 3 topic labels as summary
+                summary_labels = [t.get("label", "") for t in topics[:3] if t.get("label")]
+                if summary_labels:
+                    topics_summary = "\n".join(f"- {label}" for label in summary_labels)
+
             with st.spinner("Thinking..."):
                 response_stream = llmclient.chat.completions.create(
-                    model="model-router",
+                    model="gpt-4.1",
                     messages=[
                         {
                             "role": "system",
@@ -290,10 +301,7 @@ if st.session_state["current_view"] == "Chat":
                             Answer the user's prompt based on the following data from the database. 
                             The database contains usage history of user questions and AI responses from an AI-assisted chatbot interface, specifically used for legal advice.
 
-                            User Chat Titles: 
-                            {st.session_state["processed_chat_titles"]}
-                            Highlighted topics:
-                            {st.session_state["topics"]}
+                            Top topics summary:\n{topics_summary if topics_summary else '(No topics summary available)'}
 
                             ---
                             Prompt: {prompt}
@@ -364,7 +372,7 @@ elif st.session_state["current_view"] == "Analytics":
 
         # LLM call for top 10 topics
         response = llmclient.chat.completions.create(
-            model="model-router",
+            model="gpt-4.1",
             messages=[
                 {
                     "role": "system",

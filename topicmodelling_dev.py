@@ -3,17 +3,8 @@ from sklearn.decomposition import NMF
 import logging
 import re
 import json
-import os
-from openai import AzureOpenAI
 from preprocessor import preprocess_text
-
-
-# Initialize Azure OpenAI client
-llmclient = AzureOpenAI(
-    azure_endpoint=os.getenv("LLM_ENDPOINT"),
-    api_key=os.getenv("LLM_KEY"),
-    api_version="2024-10-01-preview",
-)
+from cloud_config import llmclient
 
 
 def extract_topics_from_text(text, max_topics=5, max_top_words=10):
@@ -114,7 +105,7 @@ def interpret_topics_with_llm(text, raw_topics):
             ...
         ]
         
-        Ensure your response can be parsed as valid JSON. Return ONLY the JSON array and nothing else.
+        You MUST respond with valid JSON only. Do not wrap it in markdown or add commentary.
         """
 
         response = llmclient.chat.completions.create(
@@ -122,7 +113,7 @@ def interpret_topics_with_llm(text, raw_topics):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a topic analysis expert who can identify meaningful themes and topics from text and return them in valid JSON format.",
+                    "content": "You are a topic analysis expert who can identify meaningful themes and topics from text and return them in valid JSON format. Do NOT add any commentary or markdown, only valid JSON.",
                 },
                 {"role": "user", "content": prompt},
             ],
