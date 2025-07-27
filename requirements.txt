@@ -1,6 +1,5 @@
 nltk
 streamlit
-datetime
 azure-cosmos
 openai
 scikit-learn

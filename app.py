@@ -376,7 +376,7 @@ elif st.session_state["current_view"] == "Analytics":
             messages=[
                 {
                     "role": "system",
-                    "content": "You're a very intelligent assistant.",
+                    "content": "You're a very intelligent legal analytics assistant.",
                 },
                 {
                     "role": "user",

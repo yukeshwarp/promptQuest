@@ -13,6 +13,7 @@ def analyze_trends(processed_chat_titles):
                                     "content": f"""
                                     Analyze the following chat titles for trends, topics, and insights based on user interactions. 
                                     Provide a summary of key trends and observations.
+                                    Return only the text.
                                     
                                     Chat Titles:
                                     {processed_chat_titles}
