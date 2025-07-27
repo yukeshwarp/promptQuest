@@ -1,5 +1,16 @@
 # promptQuest
 
+## Overview
+
+**promptQuest** is a Streamlit-based analytics dashboard for exploring and analyzing chat data stored in Azure Cosmos DB. It leverages classical NLP (topic modeling) and LLMs (via Azure OpenAI) to extract, interpret, and summarize conversational trends.
+
+### Application Architecture
+
+<img width="1390" height="914" alt="diagram-export-27-7-2025-11_58_23-pm" src="https://github.com/user-attachments/assets/3b544eaa-e102-4f68-be2b-6cc151f78bf2" />
+
+
+---
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -34,16 +45,7 @@
 
 ---
 
-## Overview
 
-**promptQuest** is a Streamlit-based analytics dashboard for exploring and analyzing chat data stored in Azure Cosmos DB. It leverages classical NLP (topic modeling) and LLMs (via Azure OpenAI) to extract, interpret, and summarize conversational trends.
-
-### Application Architecture
-
-<img width="1390" height="908" alt="diagram-export-15-7-2025-1_13_57-pm" src="https://github.com/user-attachments/assets/e059d419-5964-4928-86f0-51a4f6d02608" />
-
-
----
 
 ## Features
 
