@@ -12,5 +12,5 @@ CONTAINER_NAME = os.getenv("DB_CONTAINER_NAME")
 llmclient = AzureOpenAI(
     azure_endpoint=os.getenv("LLM_ENDPOINT"),
     api_key=os.getenv("LLM_KEY"),
-    api_version="2024-10-01-preview",
+    api_version="2024-12-01-preview",
 )
