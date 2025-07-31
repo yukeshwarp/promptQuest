@@ -4,5 +4,3 @@ azure-cosmos
 openai
 scikit-learn
 python-dotenv
-mcp-use
-langchain-openai
